@@ -1,0 +1,791 @@
+{
+  "version": "Notebook/1.0",
+  "items": [
+    {
+      "type": 1,
+      "content": {
+        "json": "## Defender CSPM ダッシュボード\nDefender CSPM のセキュリティ態勢の要点を 1 画面で表示します。詳細な分析は「Defender CSPM ダッシュボード」ブック版を使ってください。"
+      },
+      "name": "text - header"
+    },
+    {
+      "type": 9,
+      "content": {
+        "version": "KqlParameterItem/1.0",
+        "parameters": [
+          {
+            "id": "c2764572-bb8f-5854-8bf0-4d70d1fade24",
+            "version": "KqlParameterItem/1.0",
+            "name": "Subscriptions",
+            "label": "サブスクリプション",
+            "type": 6,
+            "isRequired": true,
+            "multiSelect": true,
+            "quote": "'",
+            "delimiter": ",",
+            "query": "resourcecontainers\n| where type =~ \"microsoft.resources/subscriptions\"\n| project value = id, label = name, selected = true\n| order by label asc",
+            "crossComponentResources": [
+              "value::all"
+            ],
+            "typeSettings": {
+              "additionalResourceOptions": [
+                "value::all"
+              ],
+              "showDefault": false
+            },
+            "value": [
+              "value::all"
+            ],
+            "queryType": 1,
+            "resourceType": "microsoft.resourcegraph/resources"
+          },
+          {
+            "id": "0188b342-18cb-576d-96ae-9546a31053f3",
+            "version": "KqlParameterItem/1.0",
+            "name": "Environment",
+            "label": "環境 (Azure / AWS / GCP など)",
+            "type": 2,
+            "isRequired": true,
+            "multiSelect": true,
+            "quote": "'",
+            "delimiter": ",",
+            "query": "securityresources\n| where type == \"microsoft.security/assessments\"\n| extend env = tostring(properties.resourceDetails.Source)\n| where isnotempty(env)\n| distinct env\n| order by env asc\n| project value = env, label = env",
+            "crossComponentResources": [
+              "{Subscriptions}"
+            ],
+            "typeSettings": {
+              "additionalResourceOptions": [
+                "value::all"
+              ],
+              "selectAllValue": "*",
+              "showDefault": false
+            },
+            "defaultValue": "value::all",
+            "queryType": 1,
+            "resourceType": "microsoft.resourcegraph/resources"
+          }
+        ],
+        "style": "pills",
+        "queryType": 1,
+        "resourceType": "microsoft.resourcegraph/resources"
+      },
+      "name": "parameters - filters"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "securityresources\n| where type == \"microsoft.security/securescores\"\n| where name =~ \"ascScore\"\n| summarize value = round(avg(todouble(properties.score.percentage)) * 100, 1), subs = dcount(subscriptionId)\n| extend title = \"平均セキュア スコア (%)\", subtitle = strcat(subs, \" サブスクリプションの平均\")",
+        "size": 4,
+        "title": "",
+        "noDataMessage": "該当するデータがありません。",
+        "visualization": "tiles",
+        "queryType": 1,
+        "resourceType": "microsoft.resourcegraph/resources",
+        "crossComponentResources": [
+          "{Subscriptions}"
+        ],
+        "tileSettings": {
+          "titleContent": {
+            "columnMatch": "title",
+            "formatter": 1
+          },
+          "leftContent": {
+            "columnMatch": "value",
+            "formatter": 12,
+            "formatOptions": {
+              "palette": "blue"
+            },
+            "numberFormat": {
+              "unit": 17,
+              "options": {
+                "style": "decimal",
+                "maximumFractionDigits": 1
+              }
+            }
+          },
+          "showBorder": true,
+          "subtitleContent": {
+            "columnMatch": "subtitle",
+            "formatter": 1
+          }
+        }
+      },
+      "name": "kpi - score",
+      "customWidth": "16"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "securityresources\n| where type == \"microsoft.security/assessments\"\n| extend env = tostring(properties.resourceDetails.Source)\n| where \"*\" in ({Environment}) or env in ({Environment})\n| extend status = tostring(properties.status.code)\n| extend severity = tostring(properties.metadata.severity)\n| extend riskLevel = tostring(properties.risk.level)\n| extend recName = tostring(properties.displayName)\n| extend resId = coalesce(tostring(properties.resourceDetails.Id), tostring(properties.resourceDetails.id), extract(@\"(?i)^(.*)/providers/microsoft.security/assessments/\", 1, id))\n| where status == \"Unhealthy\"\n| summarize value = dcount(name)\n| extend title = \"未対応の推奨事項\", subtitle = \"種類の数\"",
+        "size": 4,
+        "title": "",
+        "noDataMessage": "該当するデータがありません。",
+        "visualization": "tiles",
+        "queryType": 1,
+        "resourceType": "microsoft.resourcegraph/resources",
+        "crossComponentResources": [
+          "{Subscriptions}"
+        ],
+        "tileSettings": {
+          "titleContent": {
+            "columnMatch": "title",
+            "formatter": 1
+          },
+          "leftContent": {
+            "columnMatch": "value",
+            "formatter": 12,
+            "formatOptions": {
+              "palette": "orange"
+            },
+            "numberFormat": {
+              "unit": 17,
+              "options": {
+                "style": "decimal",
+                "maximumFractionDigits": 1
+              }
+            }
+          },
+          "showBorder": true,
+          "subtitleContent": {
+            "columnMatch": "subtitle",
+            "formatter": 1
+          }
+        }
+      },
+      "name": "kpi - unhealthy recs",
+      "customWidth": "16"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "securityresources\n| where type == \"microsoft.security/assessments\"\n| extend env = tostring(properties.resourceDetails.Source)\n| where \"*\" in ({Environment}) or env in ({Environment})\n| extend status = tostring(properties.status.code)\n| extend severity = tostring(properties.metadata.severity)\n| extend riskLevel = tostring(properties.risk.level)\n| extend recName = tostring(properties.displayName)\n| extend resId = coalesce(tostring(properties.resourceDetails.Id), tostring(properties.resourceDetails.id), extract(@\"(?i)^(.*)/providers/microsoft.security/assessments/\", 1, id))\n| where status == \"Unhealthy\"\n| summarize value = dcount(resId)\n| extend title = \"影響を受けるリソース\", subtitle = \"未対応の推奨事項があるリソース\"",
+        "size": 4,
+        "title": "",
+        "noDataMessage": "該当するデータがありません。",
+        "visualization": "tiles",
+        "queryType": 1,
+        "resourceType": "microsoft.resourcegraph/resources",
+        "crossComponentResources": [
+          "{Subscriptions}"
+        ],
+        "tileSettings": {
+          "titleContent": {
+            "columnMatch": "title",
+            "formatter": 1
+          },
+          "leftContent": {
+            "columnMatch": "value",
+            "formatter": 12,
+            "formatOptions": {
+              "palette": "orange"
+            },
+            "numberFormat": {
+              "unit": 17,
+              "options": {
+                "style": "decimal",
+                "maximumFractionDigits": 1
+              }
+            }
+          },
+          "showBorder": true,
+          "subtitleContent": {
+            "columnMatch": "subtitle",
+            "formatter": 1
+          }
+        }
+      },
+      "name": "kpi - affected resources",
+      "customWidth": "17"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "securityresources\n| where type == \"microsoft.security/assessments\"\n| extend env = tostring(properties.resourceDetails.Source)\n| where \"*\" in ({Environment}) or env in ({Environment})\n| extend status = tostring(properties.status.code)\n| extend severity = tostring(properties.metadata.severity)\n| extend riskLevel = tostring(properties.risk.level)\n| extend recName = tostring(properties.displayName)\n| extend resId = coalesce(tostring(properties.resourceDetails.Id), tostring(properties.resourceDetails.id), extract(@\"(?i)^(.*)/providers/microsoft.security/assessments/\", 1, id))\n| where status == \"Unhealthy\"\n| summarize value = countif(riskLevel =~ \"Critical\" or riskLevel =~ \"High\")\n| extend title = \"リスク 重大・高\", subtitle = \"Defender CSPM のリスク評価\"",
+        "size": 4,
+        "title": "",
+        "noDataMessage": "該当するデータがありません。",
+        "visualization": "tiles",
+        "queryType": 1,
+        "resourceType": "microsoft.resourcegraph/resources",
+        "crossComponentResources": [
+          "{Subscriptions}"
+        ],
+        "tileSettings": {
+          "titleContent": {
+            "columnMatch": "title",
+            "formatter": 1
+          },
+          "leftContent": {
+            "columnMatch": "value",
+            "formatter": 12,
+            "formatOptions": {
+              "palette": "redBright"
+            },
+            "numberFormat": {
+              "unit": 17,
+              "options": {
+                "style": "decimal",
+                "maximumFractionDigits": 1
+              }
+            }
+          },
+          "showBorder": true,
+          "subtitleContent": {
+            "columnMatch": "subtitle",
+            "formatter": 1
+          }
+        }
+      },
+      "name": "kpi - high risk",
+      "customWidth": "17"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "securityresources\n| where type == \"microsoft.security/attackpaths\"\n| summarize value = count()\n| extend title = \"攻撃パス\", subtitle = \"検出されたインスタンス数\"",
+        "size": 4,
+        "title": "",
+        "noDataMessage": "該当するデータがありません。",
+        "visualization": "tiles",
+        "queryType": 1,
+        "resourceType": "microsoft.resourcegraph/resources",
+        "crossComponentResources": [
+          "{Subscriptions}"
+        ],
+        "tileSettings": {
+          "titleContent": {
+            "columnMatch": "title",
+            "formatter": 1
+          },
+          "leftContent": {
+            "columnMatch": "value",
+            "formatter": 12,
+            "formatOptions": {
+              "palette": "redBright"
+            },
+            "numberFormat": {
+              "unit": 17,
+              "options": {
+                "style": "decimal",
+                "maximumFractionDigits": 1
+              }
+            }
+          },
+          "showBorder": true,
+          "subtitleContent": {
+            "columnMatch": "subtitle",
+            "formatter": 1
+          }
+        }
+      },
+      "name": "kpi - attack paths",
+      "customWidth": "17"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "securityresources\n| where type == \"microsoft.security/pricings\"\n| where name =~ \"CloudPosture\"\n| summarize value = countif(tostring(properties.pricingTier) =~ \"Standard\"), total = dcount(subscriptionId)\n| extend title = \"Defender CSPM 有効\", subtitle = strcat(\"全 \", total, \" サブスクリプション中\")",
+        "size": 4,
+        "title": "",
+        "noDataMessage": "該当するデータがありません。",
+        "visualization": "tiles",
+        "queryType": 1,
+        "resourceType": "microsoft.resourcegraph/resources",
+        "crossComponentResources": [
+          "{Subscriptions}"
+        ],
+        "tileSettings": {
+          "titleContent": {
+            "columnMatch": "title",
+            "formatter": 1
+          },
+          "leftContent": {
+            "columnMatch": "value",
+            "formatter": 12,
+            "formatOptions": {
+              "palette": "green"
+            },
+            "numberFormat": {
+              "unit": 17,
+              "options": {
+                "style": "decimal",
+                "maximumFractionDigits": 1
+              }
+            }
+          },
+          "showBorder": true,
+          "subtitleContent": {
+            "columnMatch": "subtitle",
+            "formatter": 1
+          }
+        }
+      },
+      "name": "kpi - cspm coverage",
+      "customWidth": "17"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "securityresources\n| where type == \"microsoft.security/assessments\"\n| extend env = tostring(properties.resourceDetails.Source)\n| where \"*\" in ({Environment}) or env in ({Environment})\n| extend status = tostring(properties.status.code)\n| extend severity = tostring(properties.metadata.severity)\n| extend riskLevel = tostring(properties.risk.level)\n| extend recName = tostring(properties.displayName)\n| extend resId = coalesce(tostring(properties.resourceDetails.Id), tostring(properties.resourceDetails.id), extract(@\"(?i)^(.*)/providers/microsoft.security/assessments/\", 1, id))\n| where status == \"Unhealthy\"\n| extend sevJa = case(severity =~ \"Critical\", \"重大\", severity =~ \"High\", \"高\", severity =~ \"Medium\", \"中\", severity =~ \"Low\", \"低\", \"不明\")\n| summarize count() by sevJa",
+        "size": 0,
+        "title": "未対応の推奨事項（重要度別）",
+        "noDataMessage": "該当するデータがありません。",
+        "visualization": "piechart",
+        "queryType": 1,
+        "resourceType": "microsoft.resourcegraph/resources",
+        "crossComponentResources": [
+          "{Subscriptions}"
+        ],
+        "chartSettings": {
+          "seriesLabelSettings": [
+            {
+              "seriesName": "重大",
+              "color": "redBright"
+            },
+            {
+              "seriesName": "高",
+              "color": "redBright"
+            },
+            {
+              "seriesName": "中",
+              "color": "orange"
+            },
+            {
+              "seriesName": "低",
+              "color": "yellow"
+            },
+            {
+              "seriesName": "不明",
+              "color": "gray"
+            }
+          ]
+        }
+      },
+      "name": "chart - sev",
+      "customWidth": "33"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "securityresources\n| where type == \"microsoft.security/assessments\"\n| extend env = tostring(properties.resourceDetails.Source)\n| where \"*\" in ({Environment}) or env in ({Environment})\n| extend status = tostring(properties.status.code)\n| extend severity = tostring(properties.metadata.severity)\n| extend riskLevel = tostring(properties.risk.level)\n| extend recName = tostring(properties.displayName)\n| extend resId = coalesce(tostring(properties.resourceDetails.Id), tostring(properties.resourceDetails.id), extract(@\"(?i)^(.*)/providers/microsoft.security/assessments/\", 1, id))\n| where status == \"Unhealthy\"\n| extend riskJa = case(riskLevel =~ \"Critical\", \"重大\", riskLevel =~ \"High\", \"高\", riskLevel =~ \"Medium\", \"中\", riskLevel =~ \"Low\", \"低\", \"リスク評価なし\")\n| summarize count() by riskJa",
+        "size": 0,
+        "title": "未対応の推奨事項（リスク レベル別）",
+        "noDataMessage": "該当するデータがありません。",
+        "visualization": "piechart",
+        "queryType": 1,
+        "resourceType": "microsoft.resourcegraph/resources",
+        "crossComponentResources": [
+          "{Subscriptions}"
+        ],
+        "chartSettings": {
+          "seriesLabelSettings": [
+            {
+              "seriesName": "重大",
+              "color": "redBright"
+            },
+            {
+              "seriesName": "高",
+              "color": "orange"
+            },
+            {
+              "seriesName": "中",
+              "color": "yellow"
+            },
+            {
+              "seriesName": "低",
+              "color": "blue"
+            },
+            {
+              "seriesName": "リスク評価なし",
+              "color": "gray"
+            }
+          ]
+        }
+      },
+      "name": "chart - risk",
+      "customWidth": "33"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "securityresources\n| where type == \"microsoft.security/assessments\"\n| extend env = tostring(properties.resourceDetails.Source)\n| where \"*\" in ({Environment}) or env in ({Environment})\n| extend status = tostring(properties.status.code)\n| extend severity = tostring(properties.metadata.severity)\n| extend riskLevel = tostring(properties.risk.level)\n| extend recName = tostring(properties.displayName)\n| extend resId = coalesce(tostring(properties.resourceDetails.Id), tostring(properties.resourceDetails.id), extract(@\"(?i)^(.*)/providers/microsoft.security/assessments/\", 1, id))\n| where status == \"Unhealthy\"\n| summarize count() by env",
+        "size": 0,
+        "title": "未対応の推奨事項（環境別）",
+        "noDataMessage": "該当するデータがありません。",
+        "visualization": "piechart",
+        "queryType": 1,
+        "resourceType": "microsoft.resourcegraph/resources",
+        "crossComponentResources": [
+          "{Subscriptions}"
+        ]
+      },
+      "name": "chart - env",
+      "customWidth": "33"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "securityresources\n| where type == \"microsoft.security/securescores\"\n| where name =~ \"ascScore\"\n| extend scorePct = round(todouble(properties.score.percentage) * 100, 1)\n| join kind=leftouter (resourcecontainers | where type =~ \"microsoft.resources/subscriptions\" | project subscriptionId, subscriptionName = name) on subscriptionId\n| project subscription = coalesce(subscriptionName, subscriptionId), scorePct\n| order by scorePct asc",
+        "size": 0,
+        "title": "セキュア スコア（サブスクリプション別、%）",
+        "noDataMessage": "該当するデータがありません。",
+        "visualization": "barchart",
+        "queryType": 1,
+        "resourceType": "microsoft.resourcegraph/resources",
+        "crossComponentResources": [
+          "{Subscriptions}"
+        ]
+      },
+      "name": "chart - score by sub",
+      "customWidth": "40"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "securityresources\n| where type == \"microsoft.security/assessments\"\n| extend env = tostring(properties.resourceDetails.Source)\n| where \"*\" in ({Environment}) or env in ({Environment})\n| extend status = tostring(properties.status.code)\n| extend severity = tostring(properties.metadata.severity)\n| extend riskLevel = tostring(properties.risk.level)\n| extend recName = tostring(properties.displayName)\n| extend resId = coalesce(tostring(properties.resourceDetails.Id), tostring(properties.resourceDetails.id), extract(@\"(?i)^(.*)/providers/microsoft.security/assessments/\", 1, id))\n| where status == \"Unhealthy\"\n| extend sevJa = case(severity =~ \"Critical\", \"重大\", severity =~ \"High\", \"高\", severity =~ \"Medium\", \"中\", severity =~ \"Low\", \"低\", \"不明\")\n| summarize resources = count(), criticalHigh = countif(riskLevel =~ \"Critical\" or riskLevel =~ \"High\") by recName, sevJa\n| top 10 by resources desc",
+        "size": 0,
+        "title": "未対応リソースが多い推奨事項 トップ 10",
+        "noDataMessage": "該当するデータがありません。",
+        "visualization": "table",
+        "queryType": 1,
+        "resourceType": "microsoft.resourcegraph/resources",
+        "crossComponentResources": [
+          "{Subscriptions}"
+        ],
+        "gridSettings": {
+          "formatters": [
+            {
+              "columnMatch": "resources",
+              "formatter": 4,
+              "formatOptions": {
+                "palette": "redBright"
+              }
+            },
+            {
+              "columnMatch": "criticalHigh",
+              "formatter": 4,
+              "formatOptions": {
+                "palette": "orange"
+              }
+            }
+          ],
+          "rowLimit": 10,
+          "filter": true,
+          "labelSettings": [
+            {
+              "columnId": "recName",
+              "label": "推奨事項"
+            },
+            {
+              "columnId": "sevJa",
+              "label": "重要度"
+            },
+            {
+              "columnId": "resources",
+              "label": "未対応リソース数"
+            },
+            {
+              "columnId": "criticalHigh",
+              "label": "うちリスク 重大・高"
+            }
+          ],
+          "sortBy": [
+            {
+              "itemKey": "resources",
+              "sortOrder": 2
+            }
+          ]
+        }
+      },
+      "name": "grid - top recs",
+      "customWidth": "60"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "securityresources\n| where type == \"microsoft.security/attackpaths\"\n| extend apName = tostring(properties.displayName)\n| summarize instances = count() by apName\n| top 10 by instances desc",
+        "size": 0,
+        "title": "攻撃パス（種類別 トップ 10）",
+        "noDataMessage": "攻撃パスはありません（または Defender CSPM が無効です）。",
+        "visualization": "table",
+        "queryType": 1,
+        "resourceType": "microsoft.resourcegraph/resources",
+        "crossComponentResources": [
+          "{Subscriptions}"
+        ],
+        "gridSettings": {
+          "formatters": [
+            {
+              "columnMatch": "instances",
+              "formatter": 4,
+              "formatOptions": {
+                "palette": "redBright"
+              }
+            }
+          ],
+          "rowLimit": 10,
+          "filter": true,
+          "labelSettings": [
+            {
+              "columnId": "apName",
+              "label": "攻撃パス"
+            },
+            {
+              "columnId": "instances",
+              "label": "インスタンス数"
+            }
+          ],
+          "sortBy": [
+            {
+              "itemKey": "instances",
+              "sortOrder": 2
+            }
+          ]
+        }
+      },
+      "name": "grid - attack paths",
+      "customWidth": "40"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "securityresources\n| where type == \"microsoft.security/assessments/subassessments\"\n| where tostring(properties.status.code) == \"Unhealthy\"\n| extend severity = tostring(properties.status.severity)\n| extend resId = coalesce(tostring(properties.resourceDetails.id), tostring(properties.resourceDetails.Id), extract(@\"(?i)^(.*)/providers/microsoft.security/assessments/\", 1, id))\n| extend sevJa = case(severity =~ \"Critical\", \"重大\", severity =~ \"High\", \"高\", severity =~ \"Medium\", \"中\", severity =~ \"Low\", \"低\", \"不明\")\n| summarize count() by sevJa",
+        "size": 0,
+        "title": "未対応の脆弱性（重要度別）",
+        "noDataMessage": "該当するデータがありません。",
+        "visualization": "piechart",
+        "queryType": 1,
+        "resourceType": "microsoft.resourcegraph/resources",
+        "crossComponentResources": [
+          "{Subscriptions}"
+        ],
+        "chartSettings": {
+          "seriesLabelSettings": [
+            {
+              "seriesName": "重大",
+              "color": "redBright"
+            },
+            {
+              "seriesName": "高",
+              "color": "redBright"
+            },
+            {
+              "seriesName": "中",
+              "color": "orange"
+            },
+            {
+              "seriesName": "低",
+              "color": "yellow"
+            },
+            {
+              "seriesName": "不明",
+              "color": "gray"
+            }
+          ]
+        }
+      },
+      "name": "chart - vuln sev",
+      "customWidth": "20"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "securityresources\n| where type == \"microsoft.security/assessments/subassessments\"\n| where tostring(properties.status.code) == \"Unhealthy\"\n| extend severity = tostring(properties.status.severity)\n| extend resId = coalesce(tostring(properties.resourceDetails.id), tostring(properties.resourceDetails.Id), extract(@\"(?i)^(.*)/providers/microsoft.security/assessments/\", 1, id))\n| extend sevJa = case(severity =~ \"Critical\", \"重大\", severity =~ \"High\", \"高\", severity =~ \"Medium\", \"中\", severity =~ \"Low\", \"低\", \"不明\")\n| extend findingId = tostring(properties.id), findingName = tostring(properties.displayName)\n| summarize affectedResources = dcount(resId) by findingId, findingName, sevJa\n| top 10 by affectedResources desc",
+        "size": 0,
+        "title": "影響リソースが多い脆弱性 トップ 10",
+        "noDataMessage": "該当するデータがありません。",
+        "visualization": "table",
+        "queryType": 1,
+        "resourceType": "microsoft.resourcegraph/resources",
+        "crossComponentResources": [
+          "{Subscriptions}"
+        ],
+        "gridSettings": {
+          "formatters": [
+            {
+              "columnMatch": "affectedResources",
+              "formatter": 4,
+              "formatOptions": {
+                "palette": "redBright"
+              }
+            }
+          ],
+          "rowLimit": 10,
+          "filter": true,
+          "labelSettings": [
+            {
+              "columnId": "findingId",
+              "label": "ID"
+            },
+            {
+              "columnId": "findingName",
+              "label": "脆弱性"
+            },
+            {
+              "columnId": "sevJa",
+              "label": "重要度"
+            },
+            {
+              "columnId": "affectedResources",
+              "label": "影響リソース数"
+            }
+          ],
+          "sortBy": [
+            {
+              "itemKey": "affectedResources",
+              "sortOrder": 2
+            }
+          ]
+        }
+      },
+      "name": "grid - top cves",
+      "customWidth": "40"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "securityresources\n| where type == \"microsoft.security/regulatorycompliancestandards\"\n| extend passed = tolong(properties.passedControls), failed = tolong(properties.failedControls)\n| summarize passed = sum(passed), failed = sum(failed) by standard = name\n| extend pct = iff(passed + failed > 0, round(todouble(passed) / todouble(passed + failed) * 100, 1), 0.0)\n| project standard, pct, failed\n| order by pct asc",
+        "size": 0,
+        "title": "規制コンプライアンス（標準ごとの合格率）",
+        "noDataMessage": "該当するデータがありません。",
+        "visualization": "table",
+        "queryType": 1,
+        "resourceType": "microsoft.resourcegraph/resources",
+        "crossComponentResources": [
+          "{Subscriptions}"
+        ],
+        "gridSettings": {
+          "formatters": [
+            {
+              "columnMatch": "pct",
+              "formatter": 4,
+              "formatOptions": {
+                "palette": "redGreen",
+                "min": 0,
+                "max": 100
+              }
+            },
+            {
+              "columnMatch": "failed",
+              "formatter": 4,
+              "formatOptions": {
+                "palette": "redBright"
+              }
+            }
+          ],
+          "rowLimit": 20,
+          "filter": true,
+          "labelSettings": [
+            {
+              "columnId": "standard",
+              "label": "標準"
+            },
+            {
+              "columnId": "pct",
+              "label": "合格率 (%)"
+            },
+            {
+              "columnId": "failed",
+              "label": "不合格コントロール"
+            }
+          ],
+          "sortBy": [
+            {
+              "itemKey": "pct",
+              "sortOrder": 1
+            }
+          ]
+        }
+      },
+      "name": "grid - compliance",
+      "customWidth": "40"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "securityresources\n| where type == \"microsoft.security/assessments/governanceassignments\"\n| extend assessmentId = tolower(extract(@\"(?i)^(.*)/governanceassignments/[^/]+$\", 1, id)), dueDate = todatetime(properties.remediationDueDate)\n| join kind=leftouter (securityresources | where type == \"microsoft.security/assessments\" | project assessmentId = tolower(id), status = tostring(properties.status.code)) on assessmentId\n| extend govStatus = case(status == \"Healthy\", \"完了\", isnull(dueDate), \"期限なし\", dueDate < now(), \"期限超過\", \"期限内\")\n| summarize count() by govStatus",
+        "size": 0,
+        "title": "ガバナンス（対応状況）",
+        "noDataMessage": "ガバナンス ルールの割り当てはありません。",
+        "visualization": "piechart",
+        "queryType": 1,
+        "resourceType": "microsoft.resourcegraph/resources",
+        "crossComponentResources": [
+          "{Subscriptions}"
+        ],
+        "chartSettings": {
+          "seriesLabelSettings": [
+            {
+              "seriesName": "期限超過",
+              "color": "redBright"
+            },
+            {
+              "seriesName": "期限内",
+              "color": "blue"
+            },
+            {
+              "seriesName": "完了",
+              "color": "green"
+            },
+            {
+              "seriesName": "期限なし",
+              "color": "gray"
+            }
+          ]
+        }
+      },
+      "name": "chart - governance",
+      "customWidth": "30"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "securityresources\n| where type == \"microsoft.security/pricings\"\n| where name =~ \"CloudPosture\"\n| extend state = iff(tostring(properties.pricingTier) =~ \"Standard\", \"Defender CSPM（有償）\", \"Foundational CSPM のみ\")\n| summarize count() by state",
+        "size": 0,
+        "title": "Defender CSPM の有効化状況（サブスクリプション数）",
+        "noDataMessage": "該当するデータがありません。",
+        "visualization": "piechart",
+        "queryType": 1,
+        "resourceType": "microsoft.resourcegraph/resources",
+        "crossComponentResources": [
+          "{Subscriptions}"
+        ],
+        "chartSettings": {
+          "seriesLabelSettings": [
+            {
+              "seriesName": "Defender CSPM（有償）",
+              "color": "green"
+            },
+            {
+              "seriesName": "Foundational CSPM のみ",
+              "color": "gray"
+            }
+          ]
+        }
+      },
+      "name": "chart - cspm coverage",
+      "customWidth": "30"
+    }
+  ],
+  "fallbackResourceIds": [
+    "Azure Security Center"
+  ],
+  "$schema": "https://github.com/Microsoft/Application-Insights-Workbooks/blob/master/schema/workbook.json"
+}
